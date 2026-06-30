@@ -10,11 +10,20 @@ from ..text_context import simple_tokenize
 from ._constants import PREP_CASE, UNIT_TOKEN_FRAGMENT, UNITS_DATA
 from ._helpers import (
     get_numeral_case,
+    get_target_tags_for_number,
     inflect_numeral_string,
     inflect_unit_lemma,
     safe_inflect,
     should_keep_decimal_unit_dot,
+    strip_magnitude_one_prefix,
 )
+
+CURRENCY_SUBUNIT = {
+    "рубль": ("копейка", "femn"),
+    "доллар": ("цент", "masc"),
+    "евро": ("цент", "masc"),
+    "гривна": ("копейка", "femn"),
+}
 
 DECIMAL_PATTERN = re.compile(
     rf"(?<!\d)(?P<num>(?:-|{re.escape(NEGATIVE_NUMBER_PLACEHOLDER)})?\d+[.,]\d+)(?:\s*(?P<unit>{UNIT_TOKEN_FRAGMENT})(?P<unit_dot>\.)?)?(?:\s+(?P<unit2>{UNIT_TOKEN_FRAGMENT})(?P<unit2_dot>\.)?)?(?!\d)"
@@ -142,8 +151,43 @@ def normalize_decimals(text: str) -> str:
                 unit_lower = unit_raw.lower().strip(".")
                 if not should_skip_unit_candidate(unit_raw, text[match.end("unit") :]):
                     unit_info = UNITS_DATA.get(unit_lower)
+                    if unit_info is None:
+                        p_unit = morph.parse(unit_lower)
+                        if p_unit:
+                            fallback_info = UNITS_DATA.get(p_unit[0].normal_form)
+                            if fallback_info and fallback_info[2] == "money":
+                                unit_info = fallback_info
             unit2_processed = False
             if unit_info:
+                lemma, u_gender_unit, u_category_unit, *u_suffix = unit_info
+                if u_category_unit == "money" and digits == 2:
+                    subunit = CURRENCY_SUBUNIT.get(lemma)
+                    if subunit is not None:
+                        subunit_lemma, subunit_gender = subunit
+                        int_words_c = strip_magnitude_one_prefix(
+                            inflect_numeral_string(int_part_s, case)
+                        )
+                        int_unit_c = inflect_unit_lemma(
+                            lemma,
+                            get_target_tags_for_number(int_val, case, u_gender_unit),
+                        )
+                        result = f"{int_words_c} {int_unit_c}"
+                        if frac_val > 0:
+                            frac_words_c = inflect_numeral_string(
+                                frac_part_s, case, gender=subunit_gender
+                            )
+                            frac_unit_c = inflect_unit_lemma(
+                                subunit_lemma,
+                                get_target_tags_for_number(frac_val, case, subunit_gender),
+                            )
+                            result += f" {frac_words_c} {frac_unit_c}"
+                        if is_negative:
+                            result = "минус " + result
+                        unit_dot = match.group("unit_dot")
+                        trail = text[match.end() :]
+                        if unit_dot and trail.strip() and should_keep_decimal_unit_dot(trail):
+                            result += "."
+                        return result
                 lemma, _, _, *u_suffix = unit_info
                 result += " " + inflect_unit_lemma(lemma, {"gent", "sing"})
                 if u_suffix:

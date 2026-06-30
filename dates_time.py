@@ -32,6 +32,12 @@ TEXT_DATE_RANGE_CASES = {
     "до": "genitive",
     "от": "genitive",
 }
+DATE_RANGE_S_PO_PATTERN = re.compile(
+    r"\b(?P<prep>с|со)\s+(?P<day1>\d{1,2})\s+по\s+(?P<day2>\d{1,2})\s+(?P<month>"
+    + "|".join(MONTHS_GENT.keys())
+    + r")\b",
+    re.IGNORECASE,
+)
 TEXT_DATE_RANGE_PATTERN = re.compile(
     r"\b(?:(?P<prep>за|на|в|во|по|с|со|до|от)\s+)?(?P<day1>\d{1,2})\s*[–—-]\s*(?P<day2>\d{1,2})\s+(?P<month>"
     + "|".join(MONTHS_GENT.keys())
@@ -65,9 +71,24 @@ MONTHS_GENT_BY_NUMBER = {
     12: "декабря",
 }
 NUMERIC_DATE_PATTERN = re.compile(
-    r"\b(?P<day>0?[1-9]|[12]\d|3[01])\.(?P<month>0?[1-9]|1[0-2])\.(?P<year>\d{2,4})\b"
+    r"\b(?P<day>0?[1-9]|[12]\d|3[01])[.\-](?P<month>0?[1-9]|1[0-2])[.\-](?P<year>\d{2,4})\b"
+)
+PARTIAL_DATE_PATTERN = re.compile(
+    r"\b(?P<day>0?[1-9]|[12]\d|3[01])\.(?P<month>0[1-9]|1[0-2])(?![.\d])\b"
+)
+SPACE_TIME_PATTERN = re.compile(
+    r"\b(в|к|с|до|после|около)\s+(\d{1,2})\s+(\d{2})(?!\d)",
+    re.IGNORECASE,
 )
 TIME_PATTERN = re.compile(r"\b(?P<hour>[01]?\d|2[0-3]):(?P<minute>[0-5]\d)\b")
+TIME_PREP_GENITIVE_PATTERN = re.compile(
+    r"(?:^|[\s(\"«])(?P<prep>с|со|до|от|около|после)\s*$",
+    re.IGNORECASE,
+)
+TIME_PREP_DATIVE_PATTERN = re.compile(
+    r"(?:^|[\s(\"«])к\s*$",
+    re.IGNORECASE,
+)
 DOTTED_TIME_PATTERN = re.compile(
     r"\b(?P<hour>[01]?\d|2[0-3])\.(?P<minute>[0-5]\d)\b",
     re.IGNORECASE,
@@ -109,6 +130,15 @@ def _day_to_ordinal(day: int, case: str = "genitive") -> str | None:
 
 
 def normalize_text_dates(text: str) -> str:
+    def range_s_po_repl(match: re.Match[str]) -> str:
+        prep = match.group("prep")
+        day1_word = _day_to_ordinal(int(match.group("day1")), case="genitive")
+        day2_word = _day_to_ordinal(int(match.group("day2")), case="nominative")
+        month = match.group("month").lower()
+        if day1_word is None or day2_word is None:
+            return match.group(0)
+        return f"{prep} {day1_word} по {day2_word} {month}"
+
     def range_repl(match: re.Match[str]) -> str:
         prep = match.group("prep")
         case = (
@@ -160,6 +190,7 @@ def normalize_text_dates(text: str) -> str:
             result += f" {year_to_ordinal_words(int(match.group(3)), case='gent')} года"
         return result
 
+    text = DATE_RANGE_S_PO_PATTERN.sub(range_s_po_repl, text)
     text = TEXT_DATE_RANGE_PATTERN.sub(range_repl, text)
     text = TEXT_DATE_LIST_PATTERN.sub(list_repl, text)
     return TEXT_DATE_PATTERN.sub(repl, text)
@@ -195,10 +226,21 @@ def normalize_time(text: str) -> str:
     def render_time(match: re.Match[str]) -> str:
         hour = int(match.group("hour"))
         minute_str = match.group("minute")
+        left_ctx = text[max(0, match.start() - 20) : match.start()]
+        if TIME_PREP_GENITIVE_PATTERN.search(left_ctx):
+            hour_case = "genitive"
+        elif TIME_PREP_DATIVE_PATTERN.search(left_ctx):
+            hour_case = "dative"
+        else:
+            hour_case = None
+        display_hour = 12 if hour == 0 else hour
         try:
-            hour_words = num2words.num2words(hour, lang="ru")
+            if hour_case:
+                hour_words = num2words.num2words(display_hour, lang="ru", case=hour_case)
+            else:
+                hour_words = num2words.num2words(display_hour, lang="ru")
         except Exception:
-            hour_words = str(hour)
+            hour_words = str(display_hour)
         if minute_str[0] == "0":
             try:
                 minute_words = (
@@ -211,7 +253,7 @@ def normalize_time(text: str) -> str:
                 minute_words = num2words.num2words(int(minute_str), lang="ru")
             except Exception:
                 minute_words = minute_str
-        return f"{hour_words}, {minute_words}"
+        return f"{hour_words} {minute_words}"
 
     def render_dotted_time(match: re.Match[str]) -> str:
         left_context = text[max(0, match.start() - 16) : match.start()]
@@ -227,11 +269,43 @@ def normalize_time(text: str) -> str:
     return DOTTED_TIME_PATTERN.sub(render_dotted_time, text)
 
 
+def normalize_partial_dates(text: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        day = int(match.group("day"))
+        month = int(match.group("month"))
+        if day < 1 or day > 31 or month < 1 or month > 12:
+            return match.group(0)
+        try:
+            day_words = num2words.num2words(
+                day, lang="ru", to="ordinal", case="genitive", gender="n"
+            )
+        except Exception:
+            try:
+                day_words = num2words.num2words(day, lang="ru", to="ordinal")
+            except Exception:
+                return match.group(0)
+        return f"{day_words} {MONTHS_GENT_BY_NUMBER[month]}"
+
+    return PARTIAL_DATE_PATTERN.sub(repl, text)
+
+
+def normalize_space_times(text: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        prep, h, mm = match.group(1), match.group(2), match.group(3)
+        if 0 <= int(h) <= 23 and 0 <= int(mm) <= 59:
+            return f"{prep} {h}:{mm}"
+        return match.group(0)
+
+    return SPACE_TIME_PATTERN.sub(repl, text)
+
+
 def normalize_dates_and_time(text: str, options: NormalizeOptions | None = None) -> str:
     active = options or NormalizeOptions()
     if not active.enable_dates_time_normalization:
         return text
     text = normalize_text_dates(text)
     text = normalize_dates(text)
+    text = normalize_partial_dates(text)
+    text = normalize_space_times(text)
     text = normalize_time(text)
     return text

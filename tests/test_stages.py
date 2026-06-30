@@ -246,7 +246,7 @@ class RuNormalizrStageTests(unittest.TestCase):
     def test_dates_time_stage(self):
         self.assertEqual(
             normalize_dates_and_time("Встреча в 10:07."),
-            "Встреча в десять, ноль семь.",
+            "Встреча в десять ноль семь.",
         )
 
     def test_dates_time_stage_normalizes_listed_days_in_text_date(self):

@@ -45,7 +45,7 @@ class RuNormalizrApiTests(unittest.TestCase):
     def test_normalize_function_handles_roman_and_time_pipeline(self):
         self.assertEqual(
             normalize("Глава IV. Встреча в 10:07."),
-            "Глава четвёртая. Встреча в десять, ноль семь.",
+            "Глава четвёртая. Встреча в десять ноль семь.",
         )
 
     def test_normalize_keeps_see_chapter_reference_semantics(self):
@@ -120,7 +120,7 @@ class RuNormalizrApiTests(unittest.TestCase):
 
         self.assertEqual(
             normalizer.normalize_batch(["Глава IV.", "Встреча в 10:07."]),
-            ["Глава четвёртая.", "Встреча в десять, ноль семь."],
+            ["Глава четвёртая.", "Встреча в десять ноль семь."],
         )
 
     def test_options_can_disable_first_word_decap(self):
@@ -350,7 +350,7 @@ class RuNormalizrApiTests(unittest.TestCase):
     def test_normalize_preserves_paragraph_breaks_during_full_pipeline(self):
         self.assertEqual(
             normalize("Глава IV.\n\nВстреча в 10:07."),
-            "Глава четвёртая.\n\nВстреча в десять, ноль семь.",
+            "Глава четвёртая.\n\nВстреча в десять ноль семь.",
         )
 
     def test_normalize_preserves_paragraph_break_before_quoted_uppercase_text(self):

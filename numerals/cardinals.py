@@ -26,7 +26,29 @@ from ._helpers import (
     safe_inflect,
     should_consume_abbreviation_dot,
     should_keep_decimal_unit_dot,
+    strip_magnitude_one_prefix,
 )
+
+_DIGIT_WORDS = {
+    "0": "ноль", "1": "один", "2": "два", "3": "три", "4": "четыре",
+    "5": "пять", "6": "шесть", "7": "семь", "8": "восемь", "9": "девять",
+}
+IDENTIFIER_CONTEXT_WORDS = frozenset({
+    "номер", "заказа", "заказ", "артикул", "код", "инн", "кпп", "снилс", "огрн",
+})
+
+
+def _read_digit_by_digit(num_str: str) -> str:
+    return " ".join(_DIGIT_WORDS[d] for d in num_str)
+
+
+def _is_identifier_context(tokens: list[str], idx: int) -> bool:
+    for j in range(max(0, idx - 3), idx):
+        t = tokens[j].strip().lower().strip('.,:;!"«»()[]{}')
+        if t in IDENTIFIER_CONTEXT_WORDS:
+            return True
+    return False
+
 
 GENITIVE_RANGE_CONTEXT_STEMS = (
     "диаметр",
@@ -175,6 +197,23 @@ def normalize_cardinal_numerals(text: str) -> str:
 
         is_negative, clean_token = parsed_num
         val = int(clean_token)
+
+        next_tok_lower = (
+            tokens[i + 1].lower().strip('.,:;!"«»()[]{}') if i + 1 < len(tokens) else ""
+        )
+        if not UNITS_DATA.get(next_tok_lower):
+            p_next = morph.parse(next_tok_lower) if next_tok_lower else []
+            next_tok_lower_nf = p_next[0].normal_form if p_next else ""
+            next_is_unit = bool(UNITS_DATA.get(next_tok_lower_nf))
+        else:
+            next_is_unit = True
+        if _is_identifier_context(tokens, i) and len(clean_token) >= 4 and not next_is_unit:
+            result_tokens.append(
+                build_number_token(token, clean_token, _read_digit_by_digit(clean_token), is_negative)
+            )
+            i += 1
+            continue
+
         case = get_numeral_case(tokens, i)
         inflected_num = inflect_numeral_string(clean_token, case)
         num_words = build_number_token(token, clean_token, inflected_num, is_negative)
@@ -293,10 +332,13 @@ def normalize_cardinal_numerals(text: str) -> str:
                     rem10 = val % 10
                     if rem10 in (2, 3, 4) and rem100 not in (12, 13, 14):
                         target_num_case = "nomn"
+                inflected_num_str = inflect_numeral_string(clean_token, target_num_case, u_gender)
+                if u_category == "money":
+                    inflected_num_str = strip_magnitude_one_prefix(inflected_num_str)
                 num_words = build_number_token(
                     token,
                     clean_token,
-                    inflect_numeral_string(clean_token, target_num_case, u_gender),
+                    inflected_num_str,
                     is_negative,
                 )
                 if lemma == "человек" and case in {"nomn", "accs"}:
@@ -318,8 +360,11 @@ def normalize_cardinal_numerals(text: str) -> str:
                         + full_unit
                         + noun_token[match_unit.end() :]
                     )
-                if preserve_unit_dot and should_keep_decimal_unit_dot(
-                    detokenize(tokens[i + 1 + unit_token_span :])
+                unit_trail = detokenize(tokens[i + 1 + unit_token_span :])
+                if (
+                    preserve_unit_dot
+                    and u_category != "money"
+                    and should_keep_decimal_unit_dot(unit_trail)
                 ):
                     full_unit += "."
                 result_tokens.extend([num_words, full_unit])
@@ -360,12 +405,11 @@ def normalize_cardinal_numerals(text: str) -> str:
                     rem10 = val % 10
                     if rem10 in (2, 3, 4) and rem100 not in (12, 13, 14):
                         target_num_case = "gent" if is_anim else "nomn"
-                num_words = build_number_token(
-                    token,
-                    clean_token,
-                    inflect_numeral_string(clean_token, target_num_case, gender),
-                    is_negative,
-                )
+                inflected_noun_num = inflect_numeral_string(clean_token, target_num_case, gender)
+                noun_unit_info = UNITS_DATA.get(p_noun.normal_form)
+                if noun_unit_info and noun_unit_info[2] == "money":
+                    inflected_noun_num = strip_magnitude_one_prefix(inflected_noun_num)
+                num_words = build_number_token(token, clean_token, inflected_noun_num, is_negative)
                 result_tokens.extend([num_words, noun_token])
                 i += 2
                 continue
@@ -419,7 +463,7 @@ def normalize_remaining_post_numeral_abbreviations(text: str) -> str:
         tail = source_text[match.end() :]
         stripped_tail = tail.lstrip()
         if not stripped_tail:
-            return f"{replacement}."
+            return replacement
         next_char = stripped_tail[0]
         if next_char in "\n.!?…":
             return f"{replacement}."

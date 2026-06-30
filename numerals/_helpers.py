@@ -17,6 +17,12 @@ from ._constants import ENTITY_DEFAULT_CASE, ENTITY_KEYWORDS, PREP_CASE, TIME_WO
 from ._num2words import CARDINAL_GENDER_TO_NUM2WORDS, resolve_num2words_case
 
 SENTENCE_PUNCTUATION_PATTERN = re.compile(r"\s+([.,!?;:])")
+_MAGNITUDE_ONE_RE = re.compile(r"^одн(?:а|у|ой)\s+(?=тысяч)", re.IGNORECASE)
+
+
+def strip_magnitude_one_prefix(words: str) -> str:
+    """Drop redundant 'одна/одну/одной' before 'тысяча/тысячу/тысячи/...' for natural TTS."""
+    return _MAGNITUDE_ONE_RE.sub("", words)
 POINT_NUMBER_SPACING_PATTERN = re.compile(r"(?<=\.) (?=\d)")
 POINT_WORD_PATTERN = re.compile(r"(точка [а-яё]+)\. (?=[а-яё])", flags=re.IGNORECASE)
 REPEATED_PUNCTUATION_PATTERN = re.compile(r"([,!?;:])\1+")
@@ -332,12 +338,17 @@ def _get_preposition_before_number(tokens: list[str], idx: int) -> tuple[str, st
         phrase = " ".join(prep_tokens)
         if phrase in PREP_CASE:
             return phrase, PREP_CASE[phrase]
+    morph = get_morph()
     for i in range(idx - 1, max(-1, idx - 3), -1):
         word_left = normalize_context_token(tokens[i])
         if word_left == "чем":
             break
         if word_left in PREP_CASE:
             return word_left, PREP_CASE[word_left]
+        if word_left:
+            p = morph.parse(word_left)[0]
+            if p.tag.POS == "NPRO" and p.tag.case:
+                break
     return None
 
 

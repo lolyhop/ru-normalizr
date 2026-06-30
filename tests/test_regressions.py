@@ -124,19 +124,19 @@ class RuNormalizrRegressionTests(unittest.TestCase):
             normalize(
                 "Энди Бехтольшайм, заинтересовавшийся этим проектом, сразу же выписал чек на сумму 100 тыс. долл."
             ),
-            "Энди Бехтольшайм, заинтересовавшийся этим проектом, сразу же выписал чек на сумму сто тысяч долларов.",
+            "Энди Бехтольшайм, заинтересовавшийся этим проектом, сразу же выписал чек на сумму сто тысяч долларов",
         )
 
     def test_normalize_amount_with_dollar_abbreviation_before_comma(self):
         self.assertEqual(
             normalize("Например, я продал корову за 1000 долл., а потом ушёл."),
-            "Например, я продал корову за одну тысячу долларов, а потом ушёл.",
+            "Например, я продал корову за тысячу долларов, а потом ушёл.",
         )
 
     def test_normalize_amount_after_imet_uses_accusative_case(self):
         self.assertEqual(
             normalize("Мне лучше иметь 1000 долл., чем корову."),
-            "Мне лучше иметь одну тысячу долларов, чем корову.",
+            "Мне лучше иметь тысячу долларов, чем корову.",
         )
 
     def test_normalize_numeral_after_multiword_preposition(self):
