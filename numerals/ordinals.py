@@ -337,7 +337,9 @@ def normalize_ordinals(text: str) -> str:
             target_gender = right_noun.tag.gender if right_noun and right_noun.tag.gender else "femn"
             return inflect_numeral_string(num_str, target_case, target_gender) + " "
 
-        if right_noun is not None:
+        # These suffixes directly encode the form — skip right_noun override.
+        FORM_DETERMINED_SUFFIXES = {"я", "ая", "го", "ого", "му", "ому", "ю", "ую", "ым", "им"}
+        if right_noun is not None and suffix not in FORM_DETERMINED_SUFFIXES:
             if next_clean in MONTH_GENITIVE_WORDS and suffix in {"е", "ее", "ое"}:
                 return render_ordinal(num, case="nomn", gender="neut") + " "
             singularize_plural = suffix in {"ее", "ое"}

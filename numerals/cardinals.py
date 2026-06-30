@@ -397,7 +397,11 @@ def normalize_cardinal_numerals(text: str) -> str:
 
             p_noun = morph.parse(next_token_lower)[0]
             if "NOUN" in p_noun.tag:
-                gender = TIME_WORDS.get(next_token_lower, p_noun.tag.gender)
+                _raw_gender = p_noun.tag.gender
+                gender = TIME_WORDS.get(
+                    next_token_lower,
+                    str(_raw_gender) if _raw_gender else None,
+                )
                 is_anim = "anim" in p_noun.tag
                 target_num_case = case
                 if case == "accs":

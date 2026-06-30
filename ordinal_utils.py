@@ -74,6 +74,8 @@ def find_first_noun_right(tokens_right: list[str], suffix: str):
 def find_left_name_anchor(tokens_left: list[str]):
     morph = get_morph()
     for token in reversed(tokens_left[-4:]):
+        if any(char in token for char in ".!?…"):
+            break
         clean = token.strip(".,!?;:«»\"'()[]{}")
         if not clean:
             continue
