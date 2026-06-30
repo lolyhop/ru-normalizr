@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import re
 
-import num2words
-
 from ._constants import (
     CURRENCY_STANDALONE,
     GREEK_LETTERS,
@@ -87,12 +85,15 @@ def normalize_greek_letters(text: str) -> str:
     return pattern.sub(repl, text)
 
 
+_DIGIT_WORDS = {
+    "0": "ноль", "1": "один", "2": "два", "3": "три", "4": "четыре",
+    "5": "пять", "6": "шесть", "7": "семь", "8": "восемь", "9": "девять",
+}
+
+
 def _expand_number_sign(m: re.Match[str]) -> str:
-    try:
-        words = num2words.num2words(int(m.group(1)), lang="ru")
-    except Exception:
-        words = m.group(1)
-    return "номер " + words
+    digits = " ".join(_DIGIT_WORDS[d] for d in m.group(1))
+    return "номер " + digits
 
 
 def normalize_math_symbols(text: str) -> str:

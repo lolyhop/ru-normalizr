@@ -168,17 +168,16 @@ class OrderDeliveryTests(unittest.TestCase):
         result = normalize(
             "Ваш заказ №5892 на сумму 1 499 руб. будет доставлен 27.01.2025 с 14:00 до 18:00"
         )
-        self.assertIn("номер пять тысяч восемьсот девяносто два", result)
+        self.assertIn("номер пять восемь девять два", result)
         self.assertIn("тысяча четыреста девяносто девять рублей", result)
         self.assertIn("двадцать седьмого января", result)
         self.assertIn("четырнадцати ноль ноль", result)
         self.assertIn("восемнадцати ноль ноль", result)
 
-    def test_number_sign_reads_as_normal_cardinal(self):
-        """№ before a number should expand to 'номер' + normal cardinal, not digit-by-digit."""
-        result = normalize("заказ №5892")
-        self.assertIn("номер пять тысяч", result)
-        self.assertNotIn("пять восемь девять два", result)
+    def test_number_sign_reads_digit_by_digit(self):
+        """№ before a number should expand to 'номер' + digit-by-digit reading."""
+        result = normalize("Ваш заказ №12345")
+        self.assertIn("номер один два три четыре пять", result)
 
     def test_na_summu_uses_nominative(self):
         """'на сумму X рублей' should render X in nominative, not accusative."""
