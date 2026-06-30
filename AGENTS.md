@@ -2,7 +2,16 @@
 
 ## Project purpose
 
-This repository contains `ru-normalizr`, a Russian text normalization library for TTS and NLP.
+This is a fork of [NickZaitsev/ru-normalizr](https://github.com/NickZaitsev/ru-normalizr) maintained for a specific production use case: TTS normalization for a Russian restaurant booking bot and Yandex Direct integration.
+
+Primary domain scenarios:
+- order numbers and identifiers read digit-by-digit after context words (`номер`, `заказа`, `артикул`, `код`, `инн`, `кпп` etc.)
+- booking dates — partial (`02.05`), dash-separated (`02-05-2023`), text (`15 января`)
+- times — colon format (`19:00`), space-separated (`в 7 00` → `семь ноль ноль`)
+- money amounts — abbreviated (`1500 руб.`), decimal (`3.50 рублей` → рубли/копейки)
+- date ranges with month names (`с 3 по 7 января`)
+
+Domain tests live in `tests/test_domain_examples.py`. When adding new domain scenarios, add a test there first.
 
 Core goals:
 - preserve correctness of Russian numeral and grammar normalization
@@ -64,18 +73,19 @@ Preferred bugfix workflow:
 
 For behavior changes, add or update tests in `tests/`.
 
-Run the relevant checks before finishing.
-Preferred full validation flow:
+Domain-specific tests are in `tests/test_domain_examples.py`. When adding new domain scenarios (new date formats, money patterns, identifier contexts), add a test there first.
+
+Run the full suite before finishing:
 
 ```bash
-py -3.12 scripts/dev.py check
+python -m pytest tests/
 ```
 
-If only a quick targeted pass is needed during iteration, you may use:
+For targeted iteration:
 
 ```bash
-py -3.12 scripts/dev.py test
-py -3.12 scripts/dev.py lint
+python -m pytest tests/test_domain_examples.py -v
+python -m pytest tests/test_regressions.py tests/test_reported_regressions.py -v
 ```
 
 If tests are already failing before your change, do not claim the repository is fully green. Report which failures were pre-existing and which are caused or fixed by your changes.
