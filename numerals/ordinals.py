@@ -352,7 +352,7 @@ def normalize_ordinals(text: str) -> str:
                 + " "
             )
 
-        if left_anchor is not None and not is_cardinal_suffix:
+        if left_anchor is not None and not is_cardinal_suffix and suffix not in FORM_DETERMINED_SUFFIXES:
             return render_ordinal_from_noun_parse(num, left_anchor) + " "
 
         default_case, default_gender, default_plural = normalize_ordinal_suffix_defaults(

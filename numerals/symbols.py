@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import re
 
+import num2words
+
 from ._constants import (
     CURRENCY_STANDALONE,
     GREEK_LETTERS,
     MATH_SYMBOLS,
     STANDALONE_CURRENCY_PATTERN,
 )
+
+_NUMBER_SIGN_PATTERN = re.compile(r"№\s*(\d+)")
 
 MATH_EXPRESSION_CHAR_PATTERN = re.compile(r"[0-9A-Za-zА-Яа-яЁё_,.%()+\-/*^°№]")
 APPROXIMATE_NUMBER_PATTERN = re.compile(r"(?<!\w)~\s*(?=(?:\ue001)?\d)")
@@ -83,9 +87,18 @@ def normalize_greek_letters(text: str) -> str:
     return pattern.sub(repl, text)
 
 
+def _expand_number_sign(m: re.Match[str]) -> str:
+    try:
+        words = num2words.num2words(int(m.group(1)), lang="ru")
+    except Exception:
+        words = m.group(1)
+    return "номер " + words
+
+
 def normalize_math_symbols(text: str) -> str:
     text = _normalize_contextual_equals(text)
     text = APPROXIMATE_NUMBER_PATTERN.sub("примерно ", text)
+    text = _NUMBER_SIGN_PATTERN.sub(_expand_number_sign, text)
     for char, replacement in MATH_SYMBOLS.items():
         text = text.replace(char, replacement)
     return text

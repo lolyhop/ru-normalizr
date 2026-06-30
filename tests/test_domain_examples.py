@@ -161,5 +161,52 @@ class MoneyNormalizationTests(unittest.TestCase):
         )
 
 
+class OrderDeliveryTests(unittest.TestCase):
+    """Full delivery-notification sentences combining multiple normalization features."""
+
+    def test_full_delivery_notification(self):
+        result = normalize(
+            "Ваш заказ №5892 на сумму 1 499 руб. будет доставлен 27.01.2025 с 14:00 до 18:00"
+        )
+        self.assertIn("номер пять тысяч восемьсот девяносто два", result)
+        self.assertIn("тысяча четыреста девяносто девять рублей", result)
+        self.assertIn("двадцать седьмого января", result)
+        self.assertIn("четырнадцати ноль ноль", result)
+        self.assertIn("восемнадцати ноль ноль", result)
+
+    def test_number_sign_reads_as_normal_cardinal(self):
+        """№ before a number should expand to 'номер' + normal cardinal, not digit-by-digit."""
+        result = normalize("заказ №5892")
+        self.assertIn("номер пять тысяч", result)
+        self.assertNotIn("пять восемь девять два", result)
+
+    def test_na_summu_uses_nominative(self):
+        """'на сумму X рублей' should render X in nominative, not accusative."""
+        result = normalize("на сумму 1499 руб.")
+        self.assertIn("тысяча", result)
+        self.assertNotIn("тысячу", result)
+
+
+class OrdinalSuffixTests(unittest.TestCase):
+    """Ordinal suffix forms in context."""
+
+    def test_dative_ordinal_suffix_mu_matches_noun(self):
+        """'5-му маршруту' — dative suffix 'му' should give dative ordinal."""
+        self.assertEqual(
+            normalize("Курьер едет по 5-му маршруту"),
+            "Курьер едет по пятому маршруту",
+        )
+
+    def test_feminine_nominative_ordinal_not_overridden_by_genitive_noun(self):
+        """'10-я в очереди' — 'я' suffix means feminine nominative; 'очереди' (genitive) must not override."""
+        result = normalize("Позиция 10-я в очереди")
+        self.assertIn("десятая", result)
+
+    def test_instrumental_ordinal_suffix_ym_with_noun(self):
+        """'1ым номером' — instrumental suffix 'ым' should match 'номером' (instrumental)."""
+        result = normalize("1ым номером")
+        self.assertIn("первым", result)
+
+
 if __name__ == "__main__":
     unittest.main()
