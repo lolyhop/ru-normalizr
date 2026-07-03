@@ -285,11 +285,11 @@ class AddressAbbreviationTests(unittest.TestCase):
 
 
 class AddressHouseLetterTests(unittest.TestCase):
-    """House-number letter suffixes (е.g. '15Б', '5Е') spoken as letters, not dropped."""
+    """House-number letter suffixes (е.g. '15Б', '5Е') kept as a literal letter, not dropped."""
 
     def test_uppercase_house_letter_hyphenated(self):
         result = normalize("Улица 15Б")
-        self.assertIn("пятнадцать бэ", result)
+        self.assertIn("пятнадцать Б", result)
 
     def test_lowercase_house_letter_glued(self):
         result = normalize("дом 15а")
@@ -299,6 +299,7 @@ class AddressHouseLetterTests(unittest.TestCase):
         """Uppercase 'Е' is a house letter ('дом 5Е'); lowercase '5-е' is an ordinal."""
         result_house = normalize("Дом 5Е")
         self.assertNotIn("пятое", result_house)
+        self.assertIn("пять Е", result_house)
         result_ordinal = normalize("В 1990-е годы")
         self.assertIn("девяностые", result_ordinal)
 

@@ -5,7 +5,6 @@ import re
 import num2words
 
 from .._morph import get_morph
-from ..constants import RU_LETTER_NAMES
 from ..ordinal_utils import (
     find_first_noun_right,
     find_left_name_anchor,
@@ -296,8 +295,7 @@ def normalize_hyphenated_words(text: str) -> str:
         if word_lower in CARDINAL_CASE_SUFFIXES:
             return num_words
         if is_house_letter:
-            letter_name = RU_LETTER_NAMES.get(word.upper(), word_lower)
-            return f"{num_words} {letter_name}" if letter_name else num_words
+            return f"{num_words} {word.upper()}"
         return (
             f"{num_words}{word}"
             if is_adj_like
