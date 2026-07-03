@@ -96,6 +96,23 @@ ARTICLE_ABBREVIATION_PATTERN = re.compile(r"\bст\.\s*(?=\d)", re.IGNORECASE)
 FIGURE_ABBREVIATION_PATTERN = re.compile(r"\bрис\.\s*(?=\d)", re.IGNORECASE)
 TABLE_ABBREVIATION_PATTERN = re.compile(r"\bтабл\.\s*(?=\d)", re.IGNORECASE)
 APPROXIMATE_ABBREVIATION_PATTERN = re.compile(r"\bок\.\s*(?=\d)", re.IGNORECASE)
+
+ADDRESS_CONTEXT_PATTERN = re.compile(
+    r"\b(?:дом|д\.|улиц\w*|ул\.|проспект\w*|пр-т|переулок\w*|пер\.|"
+    r"шоссе|бульвар\w*|проезд\w*|адрес\w*)\b",
+    re.IGNORECASE,
+)
+HOUSE_KORPUS_GLUED_PATTERN = re.compile(
+    r"(?<!\w)(\d+)\s*-?\s*к\.?(\d+)(?!\w)", re.IGNORECASE
+)
+HOUSE_KORPUS_SPACED_PATTERN = re.compile(
+    r"(?<!\w)(\d+)\s+к\.?\s+(\d+)(?!\w)", re.IGNORECASE
+)
+HOUSE_KORPUS_PERIOD_PATTERN = re.compile(r"\bк\.\s*(?=\d)", re.IGNORECASE)
+HOUSE_KORP_ABBREVIATION_PATTERN = re.compile(r"\bкорп\.?\s*(?=\d)", re.IGNORECASE)
+HOUSE_DOM_ABBREVIATION_PATTERN = re.compile(r"(?<!\w)д\.\s*(?=\d)", re.IGNORECASE)
+HOUSE_KV_ABBREVIATION_PATTERN = re.compile(r"\bкв\.?\s*(?=\d)", re.IGNORECASE)
+HOUSE_STROENIE_ABBREVIATION_PATTERN = re.compile(r"\bстр\.?\s*(?=\d)", re.IGNORECASE)
 ERA_ABBREVIATION_PATTERN = re.compile(
     r"(?<!\w)(?P<abbr>до\s+н\.?\s*э\.?|н\.?\s*э\.?)(?P<tail>\s*)",
     re.IGNORECASE,
@@ -165,9 +182,39 @@ def normalize_era_abbreviations(text: str) -> str:
     return ERA_ABBREVIATION_PATTERN.sub(repl, text)
 
 
+def _has_nearby_address_context(text: str, pos: int, window: int = 40) -> bool:
+    return bool(ADDRESS_CONTEXT_PATTERN.search(text[max(0, pos - window) : pos]))
+
+
+def normalize_house_address_abbreviations(text: str) -> str:
+    """Expand address-specific number notation: house+korpus ('15к1', '15-к1',
+    'д. 15, к. 2') and abbreviations ('д.', 'кв.', 'корп.') before a digit, so the
+    generic cardinal/preposition and glued-number logic never sees a bare 'к'."""
+    text = HOUSE_KORPUS_GLUED_PATTERN.sub(r"\1 корпус \2", text)
+
+    def repl_spaced_korpus(match: re.Match[str]) -> str:
+        if _has_nearby_address_context(text, match.start()):
+            return f"{match.group(1)} корпус {match.group(2)}"
+        return match.group(0)
+
+    text = HOUSE_KORPUS_SPACED_PATTERN.sub(repl_spaced_korpus, text)
+    text = HOUSE_KORPUS_PERIOD_PATTERN.sub("корпус ", text)
+    text = HOUSE_KORP_ABBREVIATION_PATTERN.sub("корпус ", text)
+    text = HOUSE_DOM_ABBREVIATION_PATTERN.sub("дом ", text)
+    text = HOUSE_KV_ABBREVIATION_PATTERN.sub("квартира ", text)
+
+    def repl_stroenie(match: re.Match[str]) -> str:
+        if _has_nearby_address_context(text, match.start()):
+            return "строение "
+        return match.group(0)
+
+    return HOUSE_STROENIE_ABBREVIATION_PATTERN.sub(repl_stroenie, text)
+
+
 def normalize_numeric_abbreviations(text: str) -> str:
     text = normalize_birth_year_abbreviations(text)
     text = normalize_mass_gram_abbreviations(text)
+    text = normalize_house_address_abbreviations(text)
     text = PAGE_ABBREVIATION_PATTERN.sub("страница ", text)
     text = PAGE_FULL_ABBREVIATION_PATTERN.sub("страница ", text)
     text = ARTICLE_ABBREVIATION_PATTERN.sub("статья ", text)

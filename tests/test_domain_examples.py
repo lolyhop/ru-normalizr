@@ -207,5 +207,101 @@ class OrdinalSuffixTests(unittest.TestCase):
         self.assertIn("первым", result)
 
 
+class AddressKorpusTests(unittest.TestCase):
+    """'Korpus' (building block) notation in delivery addresses."""
+
+    def test_glued_house_korpus(self):
+        self.assertEqual(normalize("Дом 15к1"), "Дом пятнадцать корпус один")
+
+    def test_hyphenated_house_korpus(self):
+        self.assertEqual(normalize("Дом 15-к1"), "Дом пятнадцать корпус один")
+
+    def test_spaced_glued_house_korpus(self):
+        self.assertEqual(normalize("дом 15 к1"), "дом пятнадцать корпус один")
+
+    def test_korpus_abbreviation_with_period_after_comma(self):
+        self.assertEqual(normalize("Дом 15, к. 1"), "Дом пятнадцать, корпус один")
+
+    def test_korp_abbreviation_with_period(self):
+        self.assertEqual(normalize("дом 15 корп. 2"), "дом пятнадцать корпус два")
+
+    def test_korp_abbreviation_without_period(self):
+        self.assertEqual(normalize("дом 15, корп 2"), "дом пятнадцать, корпус два")
+
+    def test_spaced_korpus_needs_address_context(self):
+        """A bare 'N к N' without an address anchor is a ratio, not a korpus."""
+        result = normalize("Ставки 5 к 3 в пользу фаворита")
+        self.assertIn("пять к трём", result)
+
+    def test_preposition_k_with_time_not_treated_as_korpus(self):
+        result = normalize("к 18:00 мы приедем")
+        self.assertNotIn("корпус", result)
+
+    def test_dative_preposition_k_before_plain_number_unaffected(self):
+        result = normalize("обратитесь к 5 специалистам")
+        self.assertIn("к пяти специалистам", result)
+
+
+class AddressAbbreviationTests(unittest.TestCase):
+    """Common Russian address abbreviations expanded before a number."""
+
+    def test_dom_abbreviation(self):
+        result = normalize("д. 15к2")
+        self.assertIn("дом пятнадцать", result)
+
+    def test_kvartira_abbreviation_with_period(self):
+        self.assertEqual(normalize("кв. 12"), "квартира двенадцать")
+
+    def test_kvartira_abbreviation_without_period(self):
+        result = normalize("дом 5к2, кв 34")
+        self.assertIn("квартира тридцать четыре", result)
+
+    def test_square_meters_not_confused_with_apartment(self):
+        """'кв м'/'кв. м' (square meters) must stay a unit, not become 'квартира'."""
+        self.assertEqual(normalize("5 кв м"), "пять квадратных метров")
+        self.assertEqual(normalize("5 кв. м"), "пять квадратных метров")
+
+    def test_full_address_with_all_components(self):
+        result = normalize("ул. Ленина, д. 5, корп. 2, кв. 34")
+        self.assertIn("улица Ленина", result)
+        self.assertIn("дом пять", result)
+        self.assertIn("корпус два", result)
+        self.assertIn("квартира тридцать четыре", result)
+
+    def test_stroenie_expands_with_address_context(self):
+        result = normalize("дом 5, стр. 2")
+        self.assertIn("строение два", result)
+
+    def test_stroenie_without_period_with_address_context(self):
+        result = normalize("дом 5 стр 2")
+        self.assertIn("строение два", result)
+
+    def test_str_page_reference_unaffected_by_address_rules(self):
+        """'стр. N' without an address anchor still means 'страница' (page)."""
+        self.assertEqual(
+            normalize("см. рис. 2 и табл. 3, стр. 4"),
+            "смотри рисунок два и таблица три, страница четыре",
+        )
+
+
+class AddressHouseLetterTests(unittest.TestCase):
+    """House-number letter suffixes (е.g. '15Б', '5Е') spoken as letters, not dropped."""
+
+    def test_uppercase_house_letter_hyphenated(self):
+        result = normalize("Улица 15Б")
+        self.assertIn("пятнадцать бэ", result)
+
+    def test_lowercase_house_letter_glued(self):
+        result = normalize("дом 15а")
+        self.assertNotEqual(result, "дом пятнадцать")
+
+    def test_house_letter_e_not_confused_with_ordinal_suffix(self):
+        """Uppercase 'Е' is a house letter ('дом 5Е'); lowercase '5-е' is an ordinal."""
+        result_house = normalize("Дом 5Е")
+        self.assertNotIn("пятое", result_house)
+        result_ordinal = normalize("В 1990-е годы")
+        self.assertIn("девяностые", result_ordinal)
+
+
 if __name__ == "__main__":
     unittest.main()

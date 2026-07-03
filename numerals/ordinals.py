@@ -5,6 +5,7 @@ import re
 import num2words
 
 from .._morph import get_morph
+from ..constants import RU_LETTER_NAMES
 from ..ordinal_utils import (
     find_first_noun_right,
     find_left_name_anchor,
@@ -17,7 +18,11 @@ from ..ordinal_utils import (
 from ..text_context import simple_tokenize
 from ._constants import HYPHENATED_WORD_PATTERN, ORDINAL_PATTERN
 from ._helpers import get_numeral_case, inflect_numeral_string
-from ._hyphen import CARDINAL_CASE_SUFFIXES, classify_numeric_hyphen_rhs
+from ._hyphen import (
+    CARDINAL_CASE_SUFFIXES,
+    classify_numeric_hyphen_rhs,
+    is_single_uppercase_letter,
+)
 from ._num2words import resolve_num2words_case
 
 HEADING_WORDS_PATTERN = (
@@ -224,8 +229,10 @@ def normalize_hyphenated_words(text: str) -> str:
             return match.group(0)
         if word_lower == "у":
             return match.group(0)
+        is_house_letter = len(word) == 1 and word.isalpha()
         if (
-            word_lower
+            not is_single_uppercase_letter(word)
+            and word_lower
             in {
                 "ый",
                 "ой",
@@ -288,6 +295,9 @@ def normalize_hyphenated_words(text: str) -> str:
         num_words = inflect_numeral_string(num_str, target_case)
         if word_lower in CARDINAL_CASE_SUFFIXES:
             return num_words
+        if is_house_letter:
+            letter_name = RU_LETTER_NAMES.get(word.upper(), word_lower)
+            return f"{num_words} {letter_name}" if letter_name else num_words
         return (
             f"{num_words}{word}"
             if is_adj_like

@@ -61,10 +61,19 @@ def is_safe_numeric_hyphen_unit(unit_raw: str) -> bool:
     return True
 
 
+def is_single_uppercase_letter(word: str) -> bool:
+    """A lone uppercase Cyrillic letter (as in '15Б', '5Е') is almost always a
+    house/building-letter marker, never a genuine ordinal or cardinal case suffix
+    (those are conventionally written lowercase: '5-е', '20-ти')."""
+    return len(word) == 1 and word.isalpha() and word.isupper()
+
+
 def classify_numeric_hyphen_rhs(word: str) -> NumericHyphenKind:
     word_lower = word.lower().strip(".")
     if is_safe_numeric_hyphen_unit(word):
         return "unit"
+    if is_single_uppercase_letter(word):
+        return "word"
     if word_lower in ORDINAL_SUFFIXES:
         return "ordinal_suffix"
     if word_lower in CARDINAL_CASE_SUFFIXES:
