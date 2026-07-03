@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+import num2words
+
 from .abbreviation_context import (
     normalize_birth_year_abbreviations,
     normalize_mass_gram_abbreviations,
@@ -117,6 +119,32 @@ HOUSE_STROENIE_GLUED_PATTERN = re.compile(
     r"(?<!\w)(\d+)\s*-?\s*стр\.?(\d+)(?!\w)", re.IGNORECASE
 )
 HOUSE_SLASH_PATTERN = re.compile(r"(?<!\w)(\d+)/(\d+)(?!\w)")
+
+PHONE_NUMBER_PATTERN = re.compile(
+    r"(?<!\d)(?P<plus>\+)?(?P<d1>[78])[\s\-.]?"
+    r"\(?(?P<d2>\d{3})\)?[\s\-.]?"
+    r"(?P<d3>\d{3})[\s\-.]?"
+    r"(?P<d4>\d{2})[\s\-.]?"
+    r"(?P<d5>\d{2})(?!\d)"
+)
+
+
+def normalize_phone_numbers(text: str) -> str:
+    """Russian-format phone numbers ('+7 917 123-45-67', '89171234567') are
+    read group-by-group ('плюс семь-девятьсот семнадцать-сто двадцать три-
+    сорок пять-шестьдесят пять'), not as one giant cardinal number."""
+
+    def repl(match: re.Match[str]) -> str:
+        groups = [
+            num2words.num2words(int(match.group(name)), lang="ru")
+            for name in ("d1", "d2", "d3", "d4", "d5")
+        ]
+        rendered = "-".join(groups)
+        return f"плюс {rendered}" if match.group("plus") else rendered
+
+    return PHONE_NUMBER_PATTERN.sub(repl, text)
+
+
 ERA_ABBREVIATION_PATTERN = re.compile(
     r"(?<!\w)(?P<abbr>до\s+н\.?\s*э\.?|н\.?\s*э\.?)(?P<tail>\s*)",
     re.IGNORECASE,
@@ -226,6 +254,7 @@ def normalize_house_address_abbreviations(text: str) -> str:
 def normalize_numeric_abbreviations(text: str) -> str:
     text = normalize_birth_year_abbreviations(text)
     text = normalize_mass_gram_abbreviations(text)
+    text = normalize_phone_numbers(text)
     text = normalize_house_address_abbreviations(text)
     text = PAGE_ABBREVIATION_PATTERN.sub("страница ", text)
     text = PAGE_FULL_ABBREVIATION_PATTERN.sub("страница ", text)

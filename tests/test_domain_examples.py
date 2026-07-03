@@ -333,5 +333,59 @@ class AddressSlashAndStroenieTests(unittest.TestCase):
         self.assertIn("строение один", result)
 
 
+class PhoneNumberTests(unittest.TestCase):
+    """Russian phone numbers are read group-by-group (1-3-3-2-2 digits),
+    not as one giant cardinal number."""
+
+    def test_glued_leading_8(self):
+        self.assertEqual(
+            normalize("89171234567"),
+            "восемь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+        )
+
+    def test_glued_plus7(self):
+        self.assertEqual(
+            normalize("+79171234567"),
+            "плюс семь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+        )
+
+    def test_space_separated(self):
+        self.assertEqual(
+            normalize("8 917 123 45 67"),
+            "восемь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+        )
+
+    def test_dash_separated(self):
+        self.assertEqual(
+            normalize("8-917-123-45-67"),
+            "восемь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+        )
+
+    def test_parens_around_operator_code(self):
+        self.assertEqual(
+            normalize("+7(917)123-45-67"),
+            "плюс семь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+        )
+
+    def test_phone_number_in_sentence(self):
+        result = normalize("Позвоните по номеру 89171234567")
+        self.assertIn(
+            "восемь-девятьсот семнадцать-сто двадцать три-сорок пять-шестьдесят семь",
+            result,
+        )
+
+    def test_short_identifier_unaffected(self):
+        """A plain 8-digit order number must still read digit-by-digit, not as a phone."""
+        self.assertEqual(
+            normalize("заказ 12345678"),
+            "заказ один два три четыре пять шесть семь восемь",
+        )
+
+    def test_ten_digit_inn_unaffected(self):
+        """A 10-digit ИНН doesn't match the 11-digit phone shape."""
+        result = normalize("ИНН 7812345678")
+        self.assertNotIn("-", result)
+
+
 if __name__ == "__main__":
     unittest.main()
