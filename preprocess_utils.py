@@ -131,15 +131,16 @@ PHONE_NUMBER_PATTERN = re.compile(
 
 def normalize_phone_numbers(text: str) -> str:
     """Russian-format phone numbers ('+7 917 123-45-67', '89171234567') are
-    read group-by-group ('плюс семь-девятьсот семнадцать-сто двадцать три-
-    сорок пять-шестьдесят пять'), not as one giant cardinal number."""
+    read group-by-group ('плюс семь, девятьсот семнадцать, сто двадцать три,
+    сорок пять, шестьдесят пять'), not as one giant cardinal number. Groups
+    are comma-separated so TTS engines insert a natural pause between them."""
 
     def repl(match: re.Match[str]) -> str:
         groups = [
             num2words.num2words(int(match.group(name)), lang="ru")
             for name in ("d1", "d2", "d3", "d4", "d5")
         ]
-        rendered = "-".join(groups)
+        rendered = ", ".join(groups)
         return f"плюс {rendered}" if match.group("plus") else rendered
 
     return PHONE_NUMBER_PATTERN.sub(repl, text)
