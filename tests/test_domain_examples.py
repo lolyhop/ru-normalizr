@@ -304,5 +304,34 @@ class AddressHouseLetterTests(unittest.TestCase):
         self.assertIn("девяностые", result_ordinal)
 
 
+class AddressSlashAndStroenieTests(unittest.TestCase):
+    """House number with slash-separated liter/korpus ('123/1') and glued
+    'стр' notation ('5стр1'), common in RU/BY address formats."""
+
+    def test_slash_house_liter_with_street_context(self):
+        result = normalize("Гродно, улица Дзержинского, 123/1")
+        self.assertIn("сто двадцать три дробь один", result)
+
+    def test_slash_house_liter_with_abbreviated_street(self):
+        result = normalize("ул. Дзержинского, 5/2")
+        self.assertIn("пять дробь два", result)
+
+    def test_slash_with_dom_and_apartment(self):
+        result = normalize("д. 10/2, кв. 5")
+        self.assertIn("дом десять дробь два", result)
+        self.assertIn("квартира пять", result)
+
+    def test_math_fraction_unaffected_without_address_context(self):
+        """'3/4 стакана' is a cooking fraction, not a house number."""
+        self.assertEqual(normalize("3/4 стакана муки"), "три четвёртых стакана муки")
+
+    def test_ratio_fraction_unaffected_without_address_context(self):
+        self.assertEqual(normalize("скидка 1/2 от суммы"), "скидка одна вторая от суммы")
+
+    def test_glued_stroenie_notation(self):
+        result = normalize("дом 5стр1")
+        self.assertIn("строение один", result)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -99,7 +99,7 @@ APPROXIMATE_ABBREVIATION_PATTERN = re.compile(r"\bок\.\s*(?=\d)", re.IGNORECAS
 
 ADDRESS_CONTEXT_PATTERN = re.compile(
     r"\b(?:дом|д\.|улиц\w*|ул\.|проспект\w*|пр-т|переулок\w*|пер\.|"
-    r"шоссе|бульвар\w*|проезд\w*|адрес\w*)\b",
+    r"шоссе|бульвар\w*|проезд\w*|адрес\w*)(?:\b|(?=\s|$))",
     re.IGNORECASE,
 )
 HOUSE_KORPUS_GLUED_PATTERN = re.compile(
@@ -113,6 +113,10 @@ HOUSE_KORP_ABBREVIATION_PATTERN = re.compile(r"\bкорп\.?\s*(?=\d)", re.IGNOR
 HOUSE_DOM_ABBREVIATION_PATTERN = re.compile(r"(?<!\w)д\.\s*(?=\d)", re.IGNORECASE)
 HOUSE_KV_ABBREVIATION_PATTERN = re.compile(r"\bкв\.?\s*(?=\d)", re.IGNORECASE)
 HOUSE_STROENIE_ABBREVIATION_PATTERN = re.compile(r"\bстр\.?\s*(?=\d)", re.IGNORECASE)
+HOUSE_STROENIE_GLUED_PATTERN = re.compile(
+    r"(?<!\w)(\d+)\s*-?\s*стр\.?(\d+)(?!\w)", re.IGNORECASE
+)
+HOUSE_SLASH_PATTERN = re.compile(r"(?<!\w)(\d+)/(\d+)(?!\w)")
 ERA_ABBREVIATION_PATTERN = re.compile(
     r"(?<!\w)(?P<abbr>до\s+н\.?\s*э\.?|н\.?\s*э\.?)(?P<tail>\s*)",
     re.IGNORECASE,
@@ -200,6 +204,7 @@ def normalize_house_address_abbreviations(text: str) -> str:
     text = HOUSE_KORPUS_SPACED_PATTERN.sub(repl_spaced_korpus, text)
     text = HOUSE_KORPUS_PERIOD_PATTERN.sub("корпус ", text)
     text = HOUSE_KORP_ABBREVIATION_PATTERN.sub("корпус ", text)
+    text = HOUSE_STROENIE_GLUED_PATTERN.sub(r"\1 строение \2", text)
     text = HOUSE_DOM_ABBREVIATION_PATTERN.sub("дом ", text)
     text = HOUSE_KV_ABBREVIATION_PATTERN.sub("квартира ", text)
 
@@ -208,7 +213,14 @@ def normalize_house_address_abbreviations(text: str) -> str:
             return "строение "
         return match.group(0)
 
-    return HOUSE_STROENIE_ABBREVIATION_PATTERN.sub(repl_stroenie, text)
+    text = HOUSE_STROENIE_ABBREVIATION_PATTERN.sub(repl_stroenie, text)
+
+    def repl_slash(match: re.Match[str]) -> str:
+        if _has_nearby_address_context(text, match.start()):
+            return f"{match.group(1)} дробь {match.group(2)}"
+        return match.group(0)
+
+    return HOUSE_SLASH_PATTERN.sub(repl_slash, text)
 
 
 def normalize_numeric_abbreviations(text: str) -> str:
